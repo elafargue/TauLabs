@@ -1,0 +1,11 @@
+<xml>
+    <object name="Radiation" singleinstance="true" settings="false">
+        <description>Radiation reading from a Geiger Counter.</description>
+        <field name="Status" units="" type="enum" elements="1" options="Invalid,Valid,Failure"/>
+        <field name="CPM" units="counts per minute" type="int32" elements="1"/>
+        <access gcs="readonly" flight="readwrite"/>
+        <telemetrygcs acked="false" updatemode="manual" period="0"/>
+        <telemetryflight acked="false" updatemode="periodic" period="3000"/>
+        <logging updatemode="periodic" period="3000"/>
+	</object>
+</xml>
