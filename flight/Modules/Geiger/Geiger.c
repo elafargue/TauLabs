@@ -56,6 +56,8 @@ int parse_geiger_stream (uint8_t c, char *rx_buffer, RadiationData *RadData);
 
 #define GEIGER_BUF_LEN 16
 
+#define GEIGER_TIMEOUT_MS 4000  // Raise the alarm if Geiger stops updating for more than 4 seconds
+
 #define	PARSER_OVERRUN	-2 // message buffer overrun before completing the message
 #define	PARSER_ERROR	-1 // message unparsable by this parser
 #define PARSER_INCOMPLETE	0 // parser needs more data to complete the message
@@ -73,7 +75,7 @@ static uint32_t usart_port;
 
 static bool module_enabled = false;
 
-
+static uint32_t timeOfLastUpdateMs;
 
 /**
  * Initialise the module
@@ -145,9 +147,14 @@ static void geigerTask(void *parameters)
 
 	radiation.CPM = 999999;
 	radiation.Status = RADIATION_STATUS_INITIALIZING;
-
 	RadiationSet(&radiation);
 
+	// We want to monitor the Geiger counter and update
+	// the UAVO in case it stops talking back to us
+	uint32_t timeNowMs = PIOS_Thread_Systime();
+	timeOfLastUpdateMs = timeNowMs;
+
+	// Main loop, never exits
 	while (1) {
 		uint8_t c;
 
@@ -159,6 +166,18 @@ static void geigerTask(void *parameters)
 				radiation.Status = RADIATION_STATUS_ERROR;
 				RadiationSet(&radiation);
 			}
+
+			if (ret == PARSER_COMPLETE) {
+				timeOfLastUpdateMs = PIOS_Thread_Systime();
+			}
+		}
+
+		// Now check for communication timeout:
+		timeNowMs = PIOS_Thread_Systime();
+		if ((timeNowMs - timeOfLastUpdateMs) >= GEIGER_TIMEOUT_MS) {
+			// we have not received any valid Geiger counter sentence for too long.
+			radiation.Status = RADIATION_STATUS_ERROR;
+			RadiationSet(&radiation);
 		}
 	}
 }
