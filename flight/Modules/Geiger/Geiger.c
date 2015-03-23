@@ -54,7 +54,7 @@ int parse_geiger_stream (uint8_t c, char *rx_buffer, RadiationData *RadData);
 
 #define TASK_PRIORITY                   PIOS_THREAD_PRIO_LOW
 
-#define BRIDGE_BUF_LEN 10
+#define GEIGER_BUF_LEN 16
 
 // ****************
 // Private variables
@@ -95,7 +95,7 @@ static int32_t geigerStart(void)
 static int32_t geigerInitialize(void)
 {
 	// TODO: Get from settings object
-	usart_port = PIOS_COM_BRIDGE;
+	usart_port = PIOS_COM_GEIGER;
 
 	/* Only run the module if we have a VCP port and a selected USART port */
 	if (!usart_port) {
@@ -116,7 +116,7 @@ static int32_t geigerInitialize(void)
 #endif
 
 	if (module_enabled) {
-		geiger_buf = PIOS_malloc(BRIDGE_BUF_LEN);
+		geiger_buf = PIOS_malloc(GEIGER_BUF_LEN);
 		PIOS_Assert(geiger_buf);
 
 		RadiationInitialize();
@@ -149,6 +149,9 @@ static void geigerTask(void *parameters)
 	}
 }
 
+/**
+ * Parse the serial data stream from a Medcom "GL" module
+ */
 int parse_geiger_stream (uint8_t c, char *rx_buffer, RadiationData *RadData) {
 	return 0;
 }

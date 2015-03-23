@@ -104,6 +104,7 @@ extern uint32_t pios_i2c_flexiport_adapter_id;
 //-------------------------
 extern uintptr_t pios_com_telem_rf_id;
 extern uintptr_t pios_com_gps_id;
+extern uintptr_t pios_com_geiger_id;
 extern uintptr_t pios_com_telem_usb_id;
 extern uintptr_t pios_com_bridge_id;
 extern uintptr_t pios_com_vcp_id;
@@ -116,6 +117,7 @@ extern uintptr_t pios_com_debug_id;
 extern uintptr_t pios_com_logging_id;
 
 #define PIOS_COM_GPS                    (pios_com_gps_id)
+#define PIOS_COM_GEIGER                 (pios_com_geiger_id)
 #define PIOS_COM_TELEM_USB              (pios_com_telem_usb_id)
 #define PIOS_COM_TELEM_RF               (pios_com_telem_rf_id)
 #define PIOS_COM_BRIDGE                 (pios_com_bridge_id)
