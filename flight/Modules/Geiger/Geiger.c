@@ -56,6 +56,12 @@ int parse_geiger_stream (uint8_t c, char *rx_buffer, RadiationData *RadData);
 
 #define GEIGER_BUF_LEN 16
 
+#define	PARSER_OVERRUN	-2 // message buffer overrun before completing the message
+#define	PARSER_ERROR	-1 // message unparsable by this parser
+#define PARSER_INCOMPLETE	0 // parser needs more data to complete the message
+#define PARSER_COMPLETE	1 // parser has received a complete message and finished processing
+
+
 // ****************
 // Private variables
 
@@ -97,7 +103,7 @@ static int32_t geigerInitialize(void)
 	// TODO: Get from settings object
 	usart_port = PIOS_COM_GEIGER;
 
-	/* Only run the module if we have a VCP port and a selected USART port */
+	/* Only run the module if we have the Geiger port selected in the configuration */
 	if (!usart_port) {
 		module_enabled = false;
 		return 0;
@@ -137,23 +143,122 @@ static void geigerTask(void *parameters)
 
 	RadiationGet(&radiation);
 
+	radiation.CPM = 999999;
+	radiation.Status = RADIATION_STATUS_INITIALIZING;
+
+	RadiationSet(&radiation);
+
 	while (1) {
 		uint8_t c;
 
 		while(PIOS_COM_ReceiveBuffer(usart_port, &c, 1, 500)) {
-			int res;
-			/* TODO : Parse Geiger value, populate Geiger UAVObject */
-			res = parse_geiger_stream (c,geiger_buf, &radiation);
-			res++;
+			int ret;
+			/* Parse Geiger value, populate Geiger UAVObject */
+			ret = parse_geiger_stream (c,geiger_buf, &radiation);
+			if (ret == PARSER_ERROR || ret == PARSER_OVERRUN) {
+				radiation.Status = RADIATION_STATUS_ERROR;
+				RadiationSet(&radiation);
+			}
 		}
 	}
 }
 
 /**
- * Parse the serial data stream from a Medcom "GL" module
+ * Parse the serial data stream from a Medcom "GL" module.
+ *
+ *  Using the proven GPS NMEA module parser as the reference for
+ *  this one, no point re-inventing the wheel
+ *
+ * A typical output string is: CPM:1:45:V
+ *   "1" is the number of readings
+ *   45 is the CPM reading
+ *   V can be "V" or "X" depending on whether reading is valid or not
+ *
+ *   Max message length: CPM:1:999999:V\r\n (16 characters)
  */
 int parse_geiger_stream (uint8_t c, char *rx_buffer, RadiationData *RadData) {
-	return 0;
+
+	static uint8_t rx_count = 0;
+	static bool start_flag = false;
+	static bool found_cr = false;
+
+	// detect start while acquiring stream
+	if (!start_flag && (c == 'C')) // Start of "CPM" line found
+	{
+		start_flag = true;
+		found_cr = false;
+		rx_count = 0;
+	}
+	else
+	if (!start_flag)
+		return PARSER_ERROR;
+
+	if (rx_count >= GEIGER_BUF_LEN)
+	{
+		// The buffer is already full and we haven't found a valid CPM reading.
+		// Flush the buffer.
+		start_flag = false;
+		found_cr = false;
+		rx_count = 0;
+		return PARSER_OVERRUN;
+	}
+	else
+	{
+		geiger_buf[rx_count] = c;
+		rx_count++;
+	}
+
+	// look for ending '\r\n' sequence
+	if (!found_cr && (c == '\r') )
+		found_cr = true;
+	else
+	if (found_cr && (c != '\n') )
+		found_cr = false;  // false end flag
+	else
+	if (found_cr && (c == '\n') )
+	{
+
+		// prepare to parse next sentence
+		start_flag = false;
+		found_cr = false;
+
+		// Make sure our buffer is null-terminated
+		// (know the last 2 characters are \r\n, we don't care about those
+		geiger_buf[rx_count-2] = 0;
+
+		// Our rxBuffer must look like this now:
+		//   [0]           = 'C'
+		//   ...           = zero or more bytes of sentence payload
+		//   [end_pos - 1] = '\r'
+		//   [end_pos]     = '\n'
+		//
+		// Now we can parse the reading.
+		// will do a few sanity checks, then get the CPM reading
+
+		// Check that we start with "CPM:1:"
+
+		// Due to the way strcmp works, we can use it to check that
+		// geiger_buf starts with "CPM:1:".
+		if (strncmp(geiger_buf, "CPM:1:", 6) != 0) {
+			rx_count = 0;
+			return PARSER_INCOMPLETE;
+		}
+
+		// We're good now: get the valid flag
+		bool valid = (geiger_buf[rx_count-3] == 'V');
+		// Parse the CPM reading into a 32bit unsigned int
+		uint32_t cpm = strtoul(&geiger_buf[6],NULL,10);
+
+		RadData->CPM = cpm;
+		RadData->Status = (valid) ? RADIATION_STATUS_VALID : RADIATION_STATUS_INVALID;
+		RadiationSet(RadData);
+
+		rx_count = 0;
+		return PARSER_COMPLETE;
+
+	}
+	return PARSER_INCOMPLETE;
+
 }
 
 
