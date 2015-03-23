@@ -113,6 +113,7 @@ UAVOBJSRCFILENAMES += hottsettings
 UAVOBJSRCFILENAMES += ubloxinfo
 UAVOBJSRCFILENAMES += picocsettings
 UAVOBJSRCFILENAMES += picocstatus
+UAVOBJSRCFILENAMES += radiation
 
 UAVOBJSRCFILENAMES += txpidsettings
 UAVOBJSRCFILENAMES += vibrationanalysissettings
